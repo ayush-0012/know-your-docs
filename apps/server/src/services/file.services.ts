@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import textract from "textract";
 
@@ -21,15 +22,27 @@ export function extractText(file) {
 
 export async function createChunks(text: string) {
   const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 500, // max characters per chunk
-    chunkOverlap: 50, // overlap between chunks
+    chunkSize: 1000, // ~150-200 words per chunk, good balance for context
+    chunkOverlap: 200, // ~20% overlap to preserve continuity
     separators: ["\n\n", "\n", ".", " "], // split by paragraph → line → sentence → word
   });
 
   const chunks = await splitter.createDocuments([text]);
-  console.log(chunks.map((doc) => doc.pageContent));
 
   return chunks.map((doc) => doc.pageContent);
 }
 
-export function createEmbeddings() {}
+export async function createEmbeddings(chunks) {
+  if (!process.env.GEMINI_API_KEY) {
+    console.log("api is missing");
+    throw new Error("google api is missingg");
+  }
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+  const response = await ai.models.embedContent({
+    model: "gemini-embedding-001",
+    contents: chunks,
+  });
+
+  return response.embeddings;
+}
