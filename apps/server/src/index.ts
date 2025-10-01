@@ -1,60 +1,27 @@
 import "dotenv/config";
-import Fastify from "fastify";
-import fastifyCors from "@fastify/cors";
+import type { Express } from "express";
+import express from "express";
+import multer from "multer";
+import { fileRouter } from "./routes/v1/file.routes";
 
-import { auth } from "./lib/auth";
+const app: Express = express();
+const upload = multer({ storage: multer.memoryStorage() });
 
-const baseCorsConfig = {
-	origin: process.env.CORS_ORIGIN || "",
-	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-	allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-	credentials: true,
-	maxAge: 86400,
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || "",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  credentials: true,
+  maxAge: 86400,
 };
 
-const fastify = Fastify({
-	logger: true,
+app.get("/", (req, res) => {
+  res.send("jfdkjf");
 });
 
-fastify.register(fastifyCors, baseCorsConfig);
+// passing the field name for file upload in multer middleware`
+app.use("/api", upload.single("file"), fileRouter);
 
-fastify.route({
-	method: ["GET", "POST"],
-	url: "/api/auth/*",
-	async handler(request, reply) {
-		try {
-			const url = new URL(request.url, `http://${request.headers.host}`);
-			const headers = new Headers();
-			Object.entries(request.headers).forEach(([key, value]) => {
-				if (value) headers.append(key, value.toString());
-			});
-			const req = new Request(url.toString(), {
-				method: request.method,
-				headers,
-				body: request.body ? JSON.stringify(request.body) : undefined,
-			});
-			const response = await auth.handler(req);
-			reply.status(response.status);
-			response.headers.forEach((value, key) => reply.header(key, value));
-			reply.send(response.body ? await response.text() : null);
-		} catch (error) {
-			fastify.log.error({ err: error }, "Authentication Error:");
-			reply.status(500).send({
-				error: "Internal authentication error",
-				code: "AUTH_FAILURE",
-			});
-		}
-	},
-});
-
-fastify.get("/", async () => {
-	return "OK";
-});
-
-fastify.listen({ port: 3000 }, (err) => {
-	if (err) {
-		fastify.log.error(err);
-		process.exit(1);
-	}
-	console.log("Server running on port 3000");
+app.listen(3000, () => {
+  console.log("server is running");
 });
