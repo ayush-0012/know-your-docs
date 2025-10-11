@@ -15,6 +15,8 @@ const corsOptions = {
   maxAge: 86400,
 };
 
+app.use(express.json());
+
 app.get("/", (req, res) => {
   res.send("jfdkjf");
 });
