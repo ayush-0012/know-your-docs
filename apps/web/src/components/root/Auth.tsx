@@ -2,12 +2,32 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { authClient } from "@/lib/auth-client";
 import { Github } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const Auth = () => {
-  const handleGithubAuth = () => {
+  const router = useRouter();
+
+  const redirectUrl = process.env.NEXT_PUBLIC_APP_URL + "/chat";
+
+  const handleGithubAuth = async () => {
     // TODO: Implement GitHub OAuth
+
+    try {
+      const { data, error } = await authClient.signIn.social({
+        provider: "github",
+        callbackURL: redirectUrl,
+      });
+
+      router.push("/chat");
+
+      console.log("data", data);
+      console.log("error", error);
+    } catch (error) {
+      console.log(error);
+    }
     console.log("GitHub authentication clicked");
   };
 
@@ -25,9 +45,9 @@ const Auth = () => {
 
         <div className="space-y-4">
           <Button
-            onClick={handleGithubAuth}
+            onClick={() => handleGithubAuth()}
             variant="outline"
-            className="w-full h-12 text-base border-border hover:bg-secondary/50 hover:shadow-elegant transition-all duration-300 bg-transparent"
+            className="cursor-pointer w-full h-12 text-base border-border hover:bg-secondary/50 hover:shadow-elegant transition-all duration-300 bg-transparent"
           >
             <Github className="w-5 h-5 mr-2" />
             Continue with GitHub
