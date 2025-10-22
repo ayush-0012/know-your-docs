@@ -13,11 +13,11 @@ export const userSchema = z.object({
 
 /* ----------------------------- CHAT SCHEMA ----------------------------- */
 export const chatSchema = z.object({
-  id: z.string(),
-  name: z.string(),
+  id: z.uuid(),
+  chatTitle: z.string(),
   userId: z.string(),
-  queryId: z.string(),
-  docId: z.string(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 
 /* ----------------------------- CHAT SCHEMA ----------------------------- */
@@ -26,6 +26,8 @@ export const querySchema = z.object({
   query: z.string(),
   response: z.string(),
   chatId: z.string(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 
 /* ----------------------------- CHAT SCHEMA ----------------------------- */
@@ -33,6 +35,8 @@ export const docSchema = z.object({
   id: z.string(),
   fileName: z.string(),
   chatId: z.string(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 
 /* ---------------------------- SESSION SCHEMA ---------------------------- */
@@ -75,10 +79,10 @@ export const verificationSchema = z.object({
 });
 
 /* ----------------------------- TYPES EXPORT ----------------------------- */
-export type User = z.infer<typeof userSchema>;
-export type chat = z.infer<typeof verificationSchema>;
-export type query = z.infer<typeof verificationSchema>;
-export type docs = z.infer<typeof verificationSchema>;
-export type Session = z.infer<typeof sessionSchema>;
-export type Account = z.infer<typeof accountSchema>;
-export type Verification = z.infer<typeof verificationSchema>;
+export type userSchemaVal = z.infer<typeof userSchema>;
+export type chatSchemaVal = z.infer<typeof chatSchema>;
+export type querySchemaVal = z.infer<typeof querySchema>;
+export type docsSchemaVal = z.infer<typeof docSchema>;
+export type sessionSchemaVal = z.infer<typeof sessionSchema>;
+export type accountSchemaVal = z.infer<typeof accountSchema>;
+export type verificationSchemaVal = z.infer<typeof verificationSchema>;
