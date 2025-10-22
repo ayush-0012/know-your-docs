@@ -1,3 +1,5 @@
+import { db } from "@/db";
+import { chat } from "@/db/schema/schema";
 import { GoogleGenAI } from "@google/genai";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import textract from "textract";
@@ -45,4 +47,30 @@ export async function createEmbeddings(chunks) {
   });
 
   return response.embeddings;
+}
+
+export async function createNewChat(
+  userId: string,
+  chatTitle: string
+): Promise<string> {
+  if (!userId) {
+    return "userId is missing";
+  }
+
+  try {
+    const chatResult = await db
+      .insert(chat)
+      .values({
+        chatTitle,
+        userId,
+      })
+      .returning();
+
+    const chatId = chatResult[0].id;
+
+    return chatId;
+  } catch (error) {
+    console.log("chat error", error);
+    return "error occurred while creating a chat";
+  }
 }
