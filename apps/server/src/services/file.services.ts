@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { chat } from "@/db/schema/schema";
+import { chat, docs, userQuery } from "@/db/schema/schema";
 import { GoogleGenAI } from "@google/genai";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import textract from "textract";
@@ -72,5 +72,48 @@ export async function createNewChat(
   } catch (error) {
     console.log("chat error", error);
     return "error occurred while creating a chat";
+  }
+}
+
+export async function storeDocMetaData(chatId: string, fileName: string) {
+  try {
+    const docResult = await db
+      .insert(docs)
+      .values({
+        fileName,
+        chatId,
+      })
+      .returning();
+
+    const doc = docResult[0];
+
+    return doc;
+  } catch (error) {
+    console.log("doc error", error);
+    return "error occurred while storing doc";
+  }
+}
+
+export async function storeUserQuery(
+  query: string,
+  response: string,
+  chatId: string
+) {
+  try {
+    const queryResult = await db
+      .insert(userQuery)
+      .values({
+        query,
+        response,
+        chatId,
+      })
+      .returning();
+
+    const queryRes = queryResult[0];
+
+    return queryRes;
+  } catch (error) {
+    console.log("doc error", error);
+    return "error occurred while storing doc";
   }
 }
