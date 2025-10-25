@@ -20,9 +20,9 @@ export const chat = pgTable("chat", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const userQuery = pgTable("user_query", {
+export const userQuery = pgTable("query", {
   id: uuid("id").defaultRandom().primaryKey(),
-  query: text().notNull(),
+  query: text("user_query").notNull(),
   response: text().notNull(),
   chatId: uuid("chat_id").references(() => chat.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
