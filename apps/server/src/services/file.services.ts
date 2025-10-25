@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { chat, docs, userQuery } from "@/db/schema/schema";
 import { GoogleGenAI } from "@google/genai";
+import { eq } from "drizzle-orm";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import textract from "textract";
 
@@ -115,5 +116,41 @@ export async function storeUserQuery(
   } catch (error) {
     console.log("doc error", error);
     return "error occurred while storing doc";
+  }
+}
+
+export async function fetchChatData(chatId: string) {
+  try {
+    const chatResult = await db
+      .select({
+        queryId: userQuery.id,
+        queryText: userQuery.query,
+        response: userQuery.response,
+        docId: docs.id,
+        fileName: docs.fileName,
+      })
+      .from(userQuery)
+      .innerJoin(docs, eq(userQuery.chatId, docs.chatId))
+      .where(eq(userQuery.chatId, chatId));
+
+    const groupedData = {
+      chatId,
+      file: {
+        id: chatResult[0]?.docId,
+        name: chatResult[0]?.fileName,
+      },
+      queries: chatResult.map((r) => ({
+        id: r.queryId,
+        query: r.queryText,
+        response: r.response,
+      })),
+    };
+
+    console.log("grouped data", groupedData);
+
+    return groupedData;
+  } catch (error) {
+    console.log("error occurred while fetching chat data");
+    return error;
   }
 }

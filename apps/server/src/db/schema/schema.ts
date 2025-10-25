@@ -20,8 +20,8 @@ export const chat = pgTable("chat", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const query = pgTable("query", {
-  id: uuid("id").primaryKey().notNull(),
+export const userQuery = pgTable("user_query", {
+  id: uuid("id").defaultRandom().primaryKey(),
   query: text().notNull(),
   response: text().notNull(),
   chatId: uuid("chat_id").references(() => chat.id),
@@ -30,7 +30,7 @@ export const query = pgTable("query", {
 });
 
 export const docs = pgTable("docs", {
-  id: uuid("id").primaryKey().notNull(),
+  id: uuid("id").defaultRandom().primaryKey(),
   fileName: text().notNull(),
   chatId: uuid("chat_id").references(() => chat.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

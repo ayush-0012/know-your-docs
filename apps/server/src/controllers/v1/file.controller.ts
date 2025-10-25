@@ -2,6 +2,8 @@ import {
   createChunks,
   createNewChat,
   extractText,
+  storeDocMetaData,
+  storeUserQuery,
 } from "@/services/file.services";
 import { namespace, pc } from "@/vectordb";
 import { GoogleGenAI } from "@google/genai";
@@ -11,48 +13,68 @@ export async function uplaodFileContent(req: Request, res: Response) {
   const file = req.file;
   console.log("file", file);
 
+  const { chatId } = req.body;
+
   if (!file) {
     return res.status(404).json({ success: false, message: "file is missing" });
   }
 
-  const extractedText: string = await extractText(file);
+  if (!chatId)
+    return res
+      .status(404)
+      .json({ success: false, message: "chatId is missing" });
 
-  const chunks = await createChunks(extractedText);
+  try {
+    // TODO: db entry of file metadata
 
-  console.log("chunks", chunks);
+    const doc = await storeDocMetaData(chatId, file.filename);
 
-  // const embeddings = await createEmbeddings(chunks);
+    const extractedText: string = await extractText(file);
 
-  // console.log("embeddings", embeddings);
+    const chunks = await createChunks(extractedText);
 
-  // using pincone's interface api for embeddings
-  const embeddingResponse = await pc.inference.embed(
-    "llama-text-embed-v2",
-    chunks,
-    { inputType: "passage" }
-  );
+    console.log("chunks", chunks);
 
-  console.log("Generated embeddings:", embeddingResponse.data);
+    // const embeddings = await createEmbeddings(chunks);
 
-  // Formatting data for Pinecone upsert
-  const vectors = chunks.map((chunk, index) => ({
-    id: `${file.originalname}-chunk-${index}-${Date.now()}`,
-    values: (embeddingResponse.data[index] as { values: number[] }).values,
-    metadata: {
-      chunk_text: chunk,
-      filename: file.originalname,
-      chunkIndex: index,
-    },
-  }));
+    // console.log("embeddings", embeddings);
 
-  // Upsert to Pinecone
-  await namespace.upsert(vectors);
+    // using pincone's interface api for embeddings
+    const embeddingResponse = await pc.inference.embed(
+      "llama-text-embed-v2",
+      chunks,
+      { inputType: "passage" }
+    );
 
-  return res.json({
-    success: true,
-    chunksProcessed: chunks.length,
-    message: "File content successfully uploaded to Pinecone",
-  });
+    console.log("Generated embeddings:", embeddingResponse.data);
+
+    // Formatting data for Pinecone upsert
+    const vectors = chunks.map((chunk, index) => ({
+      id: `${file.originalname}-chunk-${index}-${Date.now()}`,
+      values: (embeddingResponse.data[index] as { values: number[] }).values,
+      metadata: {
+        chunk_text: chunk,
+        filename: file.originalname,
+        chunkIndex: index,
+      },
+    }));
+
+    // Upsert to Pinecone
+    await namespace.upsert(vectors);
+
+    return res.json({
+      success: true,
+      chunksProcessed: chunks.length,
+      message: "File content successfully uploaded to Pinecone",
+      docDetails: doc,
+    });
+  } catch (error) {
+    return res.json({
+      success: true,
+      message: "Error occurred while uploading the file",
+      error,
+    });
+  }
 }
 
 export async function respondToQuery(req: Request, res: Response) {
@@ -174,6 +196,10 @@ ANSWER:`;
     // extracting only text from gemini's response
     const generatedText =
       responseForUser.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (generatedText) {
+      const queryRes = await storeUserQuery(userQuery, generatedText, chatId);
+    }
 
     return res.status(200).json({
       success: true,
