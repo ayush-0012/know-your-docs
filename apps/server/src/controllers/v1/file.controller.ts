@@ -27,7 +27,11 @@ export async function uplaodFileContent(req: Request, res: Response) {
   try {
     // TODO: db entry of file metadata
 
-    const doc = await storeDocMetaData(chatId, file.filename);
+    console.log("filename", file.originalname);
+
+    const doc = await storeDocMetaData(chatId, file.originalname);
+
+    console.log("doc res", doc);
 
     const extractedText: string = await extractText(file);
 
@@ -199,6 +203,7 @@ ANSWER:`;
 
     if (generatedText) {
       const queryRes = await storeUserQuery(userQuery, generatedText, chatId);
+      console.log("query res", queryRes);
     }
 
     return res.status(200).json({
