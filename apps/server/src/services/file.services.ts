@@ -114,8 +114,8 @@ export async function storeUserQuery(
 
     return queryRes;
   } catch (error) {
-    console.log("doc error", error);
-    return "error occurred while storing doc";
+    console.log("query error", error);
+    return "error occurred while storing query";
   }
 }
 
@@ -131,7 +131,7 @@ export async function fetchChatData(chatId: string, userId: string) {
       })
       .from(userQuery)
       .innerJoin(docs, eq(userQuery.chatId, docs.chatId))
-      .innerJoin(chat, eq(chat.id, userQuery.id))
+      .innerJoin(chat, eq(chat.id, userQuery.chatId))
       .where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
 
     const groupedData = {
