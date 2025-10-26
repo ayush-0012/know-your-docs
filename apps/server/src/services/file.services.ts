@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { chat, docs, userQuery } from "@/db/schema/schema";
 import { GoogleGenAI } from "@google/genai";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import textract from "textract";
 
@@ -119,7 +119,7 @@ export async function storeUserQuery(
   }
 }
 
-export async function fetchChatData(chatId: string) {
+export async function fetchChatData(chatId: string, userId: string) {
   try {
     const chatResult = await db
       .select({
@@ -131,7 +131,8 @@ export async function fetchChatData(chatId: string) {
       })
       .from(userQuery)
       .innerJoin(docs, eq(userQuery.chatId, docs.chatId))
-      .where(eq(userQuery.chatId, chatId));
+      .innerJoin(chat, eq(chat.id, userQuery.id))
+      .where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
 
     const groupedData = {
       chatId,
