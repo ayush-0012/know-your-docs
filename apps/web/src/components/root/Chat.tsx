@@ -14,7 +14,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getCurrUser } from "@/lib/actions/server.actions";
+import { getCurrUser } from "@/lib/actions/general.actions";
 import axiosInstance from "@/lib/axiosInstance";
 import { AnimatePresence, motion } from "framer-motion";
 import { FileText, Loader2, MessageSquare, Plus, Send, X } from "lucide-react";
@@ -191,6 +191,7 @@ const Chat = () => {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("userId", user?.id || "");
+      formData.append("chatId", chatId ?? "");
 
       await axiosInstance.post("/api/v1/file/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
