@@ -1,37 +1,24 @@
-// import { db } from "@/db";
-// import { chat } from "@/db/schema/schema";
-// import type { Request, Response } from "express";
+import { fetchChatData } from "@/services/file.services";
+import type { Request, Response } from "express";
 
-// export async function createNewChat(req: Request, res: Response) {
-//   const { userId, chatTitle } = req.body;
+export async function fetchChats(req: Request, res: Response) {
+  const { userId, chatId } = req.body;
 
-//   console.log("chat body", req.body);
+  try {
+    const chats = await fetchChatData(chatId, userId);
 
-//   if (!userId) {
-//     return res
-//       .status(404)
-//       .json({ userId: false, message: "userId is missing" });
-//   }
+    console.log("chats data", chats);
 
-//   try {
-//     const chatResult = await db
-//       .insert(chat)
-//       .values({
-//         chatTitle,
-//         userId,
-//       })
-//       .returning();
-
-//     return res.status(200).json({
-//       sucess: true,
-//       messgae: "chat created succesfully",
-//       chatId: chatResult[0].id,
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "error occurred while creating a chat",
-//       error,
-//     });
-//   }
-// }
+    return res.status(200).json({
+      success: true,
+      message: "Fetched chat successfully",
+      chats,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error occurred while fetching chat",
+      error,
+    });
+  }
+}
