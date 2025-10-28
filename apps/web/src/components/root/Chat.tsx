@@ -17,14 +17,14 @@ import {
 import { getCurrUser } from "@/lib/actions/general.actions";
 import axiosInstance from "@/lib/axiosInstance";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Loader2, MessageSquare, Plus, Send, X } from "lucide-react";
+import { FileText, Loader2, Plus, Send, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface Chat {
   id: string;
-  title: string;
+  chatTitle: string;
   timestamp: Date;
 }
 
@@ -49,15 +49,7 @@ const Chat = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [chats] = useState<Chat[]>([
-    { id: "1", title: "Product Documentation Q&A", timestamp: new Date() },
-    {
-      id: "2",
-      title: "Research Paper Analysis",
-      timestamp: new Date(Date.now() - 86400000),
-    },
-  ]);
-
+  const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [streamingText, setStreamingText] = useState("");
@@ -81,6 +73,53 @@ const Chat = () => {
     }
     fetchSession();
   }, []);
+
+  // Fetch all chats on mount
+  useEffect(() => {
+    const fetchChats = async () => {
+      if (!user?.id) return;
+
+      try {
+        const response = await axiosInstance.get(
+          `/api/v1/chats?userId=${user.id}`
+        );
+        if (response.data.success) {
+          setChats(response.data.userChats);
+        }
+
+        console.log(response.data.userChats);
+      } catch (error) {
+        console.error("Failed to fetch chats:", error);
+      }
+    };
+
+    fetchChats();
+  }, [user?.id]);
+
+  // Fetch messages when chatId changes
+  useEffect(() => {
+    const fetchChatMessages = async () => {
+      if (!chatId) {
+        setMessages([]);
+        setIsCenteredInput(true);
+        return;
+      }
+
+      try {
+        const response = await axiosInstance.get(
+          `/api/v1/chat/${chatId}/messages`
+        );
+        if (response.data.success) {
+          setMessages(response.data.messages);
+          setIsCenteredInput(false);
+        }
+      } catch (error) {
+        console.error("Failed to fetch chat messages:", error);
+      }
+    };
+
+    fetchChatMessages();
+  }, [chatId]);
 
   // Auto-scroll with proper handling
   useEffect(() => {
@@ -162,6 +201,20 @@ const Chat = () => {
           aiMessageId,
           response.data.chatId
         );
+
+        // If new chat was created, fetch it and add to sidebar
+        if (response.data.chatId && !chatId) {
+          try {
+            const chatResponse = await axiosInstance.get(
+              `/api/v1/chat/${response.data.chatId}`
+            );
+            if (chatResponse.data.success) {
+              setChats((prev) => [chatResponse.data.chat, ...prev]);
+            }
+          } catch (error) {
+            console.error("Failed to fetch new chat:", error);
+          }
+        }
       }
     } catch (error) {
       console.error("query failed:", error);
@@ -193,9 +246,18 @@ const Chat = () => {
       formData.append("userId", user?.id || "");
       formData.append("chatId", chatId ?? "");
 
-      await axiosInstance.post("/api/v1/file/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await axiosInstance.post(
+        "/api/v1/file/upload",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
+      // If a new chat was created, update the URL
+      if (response.data.success && response.data.chatId && !chatId) {
+        router.push(`/chat?chatId=${response.data.chatId}`);
+      }
     } catch (error) {
       console.error("Upload failed:", error);
       alert("Failed to upload file.");
@@ -203,6 +265,14 @@ const Chat = () => {
     } finally {
       setTimeout(() => setIsUploading(false), 1000);
     }
+  };
+
+  const handleChatClick = (chatId: string) => {
+    router.push(`/chat?chatId=${chatId}`);
+  };
+
+  const handleNewChat = () => {
+    router.push("/chat");
   };
 
   const removeFile = () => {
@@ -227,6 +297,7 @@ const Chat = () => {
               size="icon"
               variant="ghost"
               className="text-neutral-400 hover:text-neutral-100"
+              onClick={handleNewChat}
             >
               <Plus className="w-4 h-4" />
             </Button>
@@ -241,9 +312,14 @@ const Chat = () => {
                 <SidebarMenu>
                   {chats.map((chat) => (
                     <SidebarMenuItem key={chat.id}>
-                      <SidebarMenuButton className="text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800">
-                        <MessageSquare className="w-4 h-4" />
-                        <span className="truncate">{chat.title}</span>
+                      <SidebarMenuButton
+                        className="text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800"
+                        onClick={() => handleChatClick(chat.id)}
+                      >
+                        {/* <MessageSquare className="w-4 h-4" /> */}
+                        <span className="truncate text-white  ">
+                          {chat.chatTitle}
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
