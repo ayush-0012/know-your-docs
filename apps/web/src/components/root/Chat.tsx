@@ -19,13 +19,30 @@ import axiosInstance from "@/lib/axiosInstance";
 import { AnimatePresence, motion } from "framer-motion";
 import { FileText, Loader2, Plus, Send, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface Chat {
   id: string;
   chatTitle: string;
   timestamp: Date;
+}
+
+interface FileInfo {
+  id: string;
+  name: string;
+}
+
+interface Query {
+  id: string;
+  query: string;
+  response: string;
+}
+
+interface ChatDetail {
+  chatId: string;
+  file: FileInfo;
+  queries: Query[];
 }
 
 interface Message {
@@ -51,6 +68,7 @@ const Chat = () => {
 
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [currentFile, setCurrentFile] = useState<FileInfo | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const [isCenteredInput, setIsCenteredInput] = useState(true);
@@ -58,23 +76,35 @@ const Chat = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadingFile, setUploadingFile] = useState<File | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isAtBottomRef = useRef(true);
 
-  const chatId = searchParams.get("chatId");
+  const chatId = searchParams?.get("chatId");
   const isEmptyChat = messages.length === 0;
 
+  // Fetch user session
   useEffect(() => {
     async function fetchSession() {
-      const currUser = await getCurrUser();
-      if (currUser?.user) {
-        setUser(currUser.user);
+      try {
+        setIsUserLoading(true);
+        const currUser = await getCurrUser();
+        if (currUser?.user) {
+          setUser(currUser.user);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user:", error);
+      } finally {
+        setIsUserLoading(false);
       }
     }
     fetchSession();
   }, []);
 
-  // Fetch all chats on mount
+  // Fetch all chats when user is available
   useEffect(() => {
     const fetchChats = async () => {
       if (!user?.id) return;
@@ -83,11 +113,12 @@ const Chat = () => {
         const response = await axiosInstance.get(
           `/api/v1/chats?userId=${user.id}`
         );
+
+        console.log("user chats", response.data);
+
         if (response.data.success) {
           setChats(response.data.userChats);
         }
-
-        console.log(response.data.userChats);
       } catch (error) {
         console.error("Failed to fetch chats:", error);
       }
@@ -101,17 +132,52 @@ const Chat = () => {
     const fetchChatMessages = async () => {
       if (!chatId) {
         setMessages([]);
+        setCurrentFile(null);
         setIsCenteredInput(true);
+        setUploadingFile(null);
         return;
       }
 
+      if (!user?.id) return;
+
+      console.log(chatId);
+      console.log(user?.id);
+
       try {
         const response = await axiosInstance.get(
-          `/api/v1/chat/${chatId}/messages`
+          `/api/v1/chat/${chatId}/messages`,
+          {
+            params: { userId: user.id },
+          }
         );
+
+        console.log("conversation", response.data);
+
         if (response.data.success) {
-          setMessages(response.data.messages);
+          const chatDetail: ChatDetail = response.data.chats;
+
+          setCurrentFile(chatDetail.file);
+
+          // Convert queries to messages with unique IDs
+          const convertedMessages: Message[] = [];
+          chatDetail.queries.forEach((query, index) => {
+            // Add user message with unique ID
+            convertedMessages.push({
+              id: `${query.id}-user-${index}`,
+              role: "user",
+              content: query.query,
+            });
+            // Add assistant response with unique ID
+            convertedMessages.push({
+              id: `${query.id}-assistant-${index}`,
+              role: "assistant",
+              content: query.response,
+            });
+          });
+
+          setMessages(convertedMessages);
           setIsCenteredInput(false);
+          setUploadingFile(null);
         }
       } catch (error) {
         console.error("Failed to fetch chat messages:", error);
@@ -119,12 +185,29 @@ const Chat = () => {
     };
 
     fetchChatMessages();
-  }, [chatId]);
+  }, [chatId, user?.id]);
 
-  // Auto-scroll with proper handling
+  // Cleanup streaming interval on unmount
+  useEffect(() => {
+    return () => {
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Track if user is at bottom for auto-scroll
+  const handleScroll = useCallback(() => {
+    if (scrollAreaRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
+      isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
+    }
+  }, []);
+
+  // Auto-scroll only if user is at bottom
   useEffect(() => {
     const scrollToBottom = () => {
-      if (messagesEndRef.current) {
+      if (messagesEndRef.current && isAtBottomRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
       }
     };
@@ -133,61 +216,76 @@ const Chat = () => {
     return () => clearTimeout(timeoutId);
   }, [messages, streamingText]);
 
-  const simulateStreaming = (
-    text: string,
-    messageId: string,
-    newChatId?: string
-  ) => {
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < text.length) {
-        setStreamingText(text.slice(0, index + 1));
-        index++;
-      } else {
-        clearInterval(interval);
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === messageId
-              ? { ...msg, content: text, isStreaming: false }
-              : msg
-          )
-        );
-        setStreamingText("");
+  const simulateStreaming = useCallback(
+    (text: string, messageId: string, newChatId?: string) => {
+      let index = 0;
 
-        if (newChatId && !chatId) {
-          const params = new URLSearchParams(searchParams.toString());
-          params.set("chatId", newChatId);
-          router.push(`?${params.toString()}`, { scroll: false });
-        }
+      // Clear any existing interval
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
       }
-    }, 20);
-  };
+
+      streamingIntervalRef.current = setInterval(() => {
+        if (index < text.length) {
+          setStreamingText(text.slice(0, index + 1));
+          index++;
+        } else {
+          if (streamingIntervalRef.current) {
+            clearInterval(streamingIntervalRef.current);
+            streamingIntervalRef.current = null;
+          }
+
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, content: text, isStreaming: false }
+                : msg
+            )
+          );
+          setStreamingText("");
+
+          // Update URL if new chat was created
+          if (newChatId && !chatId) {
+            const params = new URLSearchParams(searchParams?.toString() || "");
+            params.set("chatId", newChatId);
+            router.push(`/chat?${params.toString()}`, { scroll: false });
+          }
+        }
+      }, 20);
+    },
+    [chatId, router, searchParams]
+  );
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isProcessing) return;
+    if (!inputValue.trim() || isProcessing || !user?.id) return;
 
     setIsCenteredInput(false);
     setIsProcessing(true);
 
     const newMessage: Message = {
-      id: Date.now().toString(),
+      id: `temp-user-${Date.now()}`,
       role: "user",
       content: inputValue,
     };
 
     setMessages((prev) => [...prev, newMessage]);
+    const query = inputValue;
     setInputValue("");
 
     try {
+      // Generate chat title from first few words of query
+      const chatTitle =
+        query.length > 50 ? query.substring(0, 50) + "..." : query;
+
       const response = await axiosInstance.post("/api/v1/file/query", {
-        userId: user?.id,
+        userId: user.id,
         chatId: chatId || undefined,
-        chatTitle: "something",
-        userQuery: inputValue,
+        chatTitle: chatTitle,
+        userQuery: query,
       });
 
       if (response.data.success) {
-        const aiMessageId = (Date.now() + 1).toString();
+        const aiMessageId = `temp-assistant-${Date.now()}`;
         const aiResponse: Message = {
           id: aiMessageId,
           role: "assistant",
@@ -202,7 +300,7 @@ const Chat = () => {
           response.data.chatId
         );
 
-        // If new chat was created, fetch it and add to sidebar
+        // If new chat was created, fetch and add to sidebar
         if (response.data.chatId && !chatId) {
           try {
             const chatResponse = await axiosInstance.get(
@@ -210,6 +308,7 @@ const Chat = () => {
             );
             if (chatResponse.data.success) {
               setChats((prev) => [chatResponse.data.chat, ...prev]);
+              setCurrentFile(chatResponse.data.chat.file);
             }
           } catch (error) {
             console.error("Failed to fetch new chat:", error);
@@ -217,8 +316,8 @@ const Chat = () => {
         }
       }
     } catch (error) {
-      console.error("query failed:", error);
-      const errorMessageId = (Date.now() + 1).toString();
+      console.error("Query failed:", error);
+      const errorMessageId = `temp-error-${Date.now()}`;
       const errorMessage: Message = {
         id: errorMessageId,
         role: "assistant",
@@ -234,8 +333,23 @@ const Chat = () => {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user?.id) return;
+
     e.target.value = "";
+
+    // Validate file type
+    const allowedTypes = [".pdf", ".doc", ".docx", ".txt"];
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+    if (!allowedTypes.includes(fileExtension)) {
+      alert("Please upload a valid file type: PDF, DOC, DOCX, or TXT");
+      return;
+    }
+
+    // Validate file size (e.g., max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size must be less than 10MB");
+      return;
+    }
 
     setUploadingFile(file);
     setIsUploading(true);
@@ -243,8 +357,10 @@ const Chat = () => {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("userId", user?.id || "");
-      formData.append("chatId", chatId ?? "");
+      formData.append("userId", user.id);
+      if (chatId) {
+        formData.append("chatId", chatId);
+      }
 
       const response = await axiosInstance.post(
         "/api/v1/file/upload",
@@ -254,16 +370,39 @@ const Chat = () => {
         }
       );
 
-      // If a new chat was created, update the URL
-      if (response.data.success && response.data.chatId && !chatId) {
-        router.push(`/chat?chatId=${response.data.chatId}`);
+      console.log("file upload res", response.data);
+
+      if (response.data.success) {
+        // If new chat was created, navigate to it
+        if (response.data.docDetails.chatId && !chatId) {
+          router.push(`/chat?chatId=${response.data.docDetails.chatId}`);
+
+          // Fetch the new chat and add to sidebar
+          try {
+            const chatResponse = await axiosInstance.get(`/api/v1/chats`, {
+              params: { userId: user?.id },
+            });
+
+            console.log("chat res", chatResponse.data);
+            if (chatResponse.data.success) {
+              setChats((prev) => [chatResponse.data.userChats, ...prev]);
+            }
+          } catch (error) {
+            console.error("Failed to fetch new chat:", error);
+          }
+        }
+
+        // Clear upload state after successful upload
+        setTimeout(() => {
+          setUploadingFile(null);
+        }, 1500);
       }
     } catch (error) {
       console.error("Upload failed:", error);
-      alert("Failed to upload file.");
+      alert("Failed to upload file. Please try again.");
       setUploadingFile(null);
     } finally {
-      setTimeout(() => setIsUploading(false), 1000);
+      setIsUploading(false);
     }
   };
 
@@ -285,6 +424,124 @@ const Chat = () => {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
+
+  // Render input component (DRY principle)
+  const renderInputBox = (isCentered: boolean) => (
+    <div
+      className={`bg-[#1c1c1c]/95 backdrop-blur-md border border-[#2a2a2a] rounded-2xl shadow-2xl transition-all duration-300 ${
+        uploadingFile ? "py-3" : "py-2"
+      }`}
+    >
+      <div className="flex flex-col gap-2 px-3">
+        <AnimatePresence>
+          {uploadingFile && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="flex items-center justify-between bg-[#242424] border border-neutral-700 rounded-xl px-3 py-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-6 h-6 bg-neutral-800 rounded-md flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-4 h-4 text-neutral-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] text-neutral-200">
+                      {uploadingFile.name}
+                    </p>
+                    <p className="text-xs text-neutral-500">
+                      {formatFileSize(uploadingFile.size)}{" "}
+                      {isUploading && (
+                        <span className="text-blue-400 ml-1">Uploading...</span>
+                      )}
+                      {!isUploading && (
+                        <span className="text-green-400 ml-1">✓ Ready</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={removeFile}
+                  className="p-1 rounded-md hover:bg-neutral-700 transition flex-shrink-0"
+                >
+                  <X className="w-4 h-4 text-neutral-400 hover:text-neutral-200" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex items-center gap-3">
+          <input
+            type="file"
+            id={isCentered ? "file-upload-center" : "file-upload"}
+            hidden
+            onChange={handleFileUpload}
+            disabled={isUploading || isUserLoading}
+            accept=".pdf,.doc,.docx,.txt"
+          />
+
+          <button
+            onClick={() =>
+              document
+                .getElementById(
+                  isCentered ? "file-upload-center" : "file-upload"
+                )
+                ?.click()
+            }
+            disabled={isUploading || isUserLoading}
+            className="text-neutral-400 hover:text-white transition disabled:opacity-50 flex-shrink-0"
+          >
+            {isUploading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Plus className="w-5 h-5" />
+            )}
+          </button>
+
+          <input
+            placeholder="Ask anything..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            disabled={isProcessing || isUserLoading}
+            className="flex-1 bg-transparent border-0 text-neutral-100 placeholder-neutral-500 outline-none text-[15px] py-3 px-1 disabled:opacity-50"
+          />
+
+          <button
+            onClick={handleSendMessage}
+            disabled={!inputValue.trim() || isProcessing || isUserLoading}
+            className={`p-2.5 rounded-full transition flex-shrink-0 ${
+              inputValue.trim() && !isProcessing && !isUserLoading
+                ? "bg-purple-600 hover:bg-purple-700 text-white"
+                : "bg-[#2a2a2a] text-neutral-500 cursor-not-allowed"
+            }`}
+          >
+            {isProcessing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isUserLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-neutral-900">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -313,11 +570,12 @@ const Chat = () => {
                   {chats.map((chat) => (
                     <SidebarMenuItem key={chat.id}>
                       <SidebarMenuButton
-                        className="text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800"
+                        className={`text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 ${
+                          chatId === chat.id ? "bg-neutral-800" : ""
+                        }`}
                         onClick={() => handleChatClick(chat.id)}
                       >
-                        {/* <MessageSquare className="w-4 h-4" /> */}
-                        <span className="truncate text-white  ">
+                        <span className="truncate text-white">
                           {chat.chatTitle}
                         </span>
                       </SidebarMenuButton>
@@ -336,9 +594,26 @@ const Chat = () => {
           </header>
 
           {/* Chat Messages */}
-          <ScrollArea className="flex-1 bg-neutral-900" ref={scrollAreaRef}>
+          <ScrollArea
+            className="flex-1 bg-neutral-900"
+            ref={scrollAreaRef}
+            onScroll={handleScroll}
+          >
             <div className={`${!isEmptyChat ? "pt-8" : ""}`}>
               <div className="max-w-3xl mx-auto space-y-6 px-6 pb-[200px]">
+                {/* File indicator */}
+                {currentFile && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-neutral-800/50 rounded-lg border border-neutral-700/50 w-fit">
+                    <FileText className="w-4 h-4 text-purple-400" />
+                    <span className="text-sm text-neutral-300">
+                      Chatting about:{" "}
+                      <span className="font-medium text-neutral-100">
+                        {currentFile.name}
+                      </span>
+                    </span>
+                  </div>
+                )}
+
                 {messages.map((message) => (
                   <div key={message.id} className="space-y-2">
                     {message.role === "user" ? (
@@ -456,235 +731,23 @@ const Chat = () => {
           )}
 
           {/* Input Box - Fixed at bottom */}
-          <div
-            className={`fixed bottom-0 left-0 right-0 flex items-center justify-center transition-all duration-500 bg-gradient-to-t from-neutral-900 via-neutral-900/95 to-transparent pt-8 ${
-              isCenteredInput ? "hidden" : ""
-            }`}
-            style={{
-              marginLeft: "var(--sidebar-width, 0px)",
-            }}
-          >
-            <div className="w-full max-w-3xl px-6 pb-6">
-              <div
-                className={`bg-[#1c1c1c]/95 backdrop-blur-md border border-[#2a2a2a] rounded-2xl shadow-2xl transition-all duration-300 ${
-                  uploadingFile ? "py-3" : "py-2"
-                }`}
-              >
-                <div className="flex flex-col gap-2 px-3">
-                  {/* File Chip */}
-                  <AnimatePresence>
-                    {uploadingFile && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="flex items-center justify-between bg-[#242424] border border-neutral-700 rounded-xl px-3 py-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-6 h-6 bg-neutral-800 rounded-md flex items-center justify-center flex-shrink-0">
-                              <FileText className="w-4 h-4 text-neutral-400" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-[13px] text-neutral-200">
-                                {uploadingFile.name}
-                              </p>
-                              <p className="text-xs text-neutral-500">
-                                {formatFileSize(uploadingFile.size)}{" "}
-                                {isUploading && (
-                                  <span className="text-blue-400 ml-1">
-                                    Uploading...
-                                  </span>
-                                )}
-                                {!isUploading && (
-                                  <span className="text-green-400 ml-1">
-                                    ✓ Ready
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={removeFile}
-                            className="p-1 rounded-md hover:bg-neutral-700 transition flex-shrink-0"
-                          >
-                            <X className="w-4 h-4 text-neutral-400 hover:text-neutral-200" />
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Input Row */}
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="file"
-                      id="file-upload"
-                      hidden
-                      onChange={handleFileUpload}
-                      disabled={isUploading}
-                      accept=".pdf,.doc,.docx,.txt"
-                    />
-
-                    <button
-                      onClick={() =>
-                        document.getElementById("file-upload")?.click()
-                      }
-                      disabled={isUploading}
-                      className="text-neutral-400 hover:text-white transition disabled:opacity-50 flex-shrink-0"
-                    >
-                      {isUploading ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Plus className="w-5 h-5" />
-                      )}
-                    </button>
-
-                    <input
-                      placeholder="Ask anything..."
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      disabled={isProcessing}
-                      className="flex-1 bg-transparent border-0 text-neutral-100 placeholder-neutral-500 outline-none text-[15px] py-3 px-1 disabled:opacity-50"
-                    />
-
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!inputValue.trim() || isProcessing}
-                      className={`p-2.5 rounded-full transition flex-shrink-0 ${
-                        inputValue.trim() && !isProcessing
-                          ? "bg-purple-600 hover:bg-purple-700 text-white"
-                          : "bg-[#2a2a2a] text-neutral-500 cursor-not-allowed"
-                      }`}
-                    >
-                      {isProcessing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+          {!isCenteredInput && (
+            <div
+              className="fixed bottom-0 left-0 right-0 flex items-center justify-center transition-all duration-500 bg-gradient-to-t from-neutral-900 via-neutral-900/95 to-transparent pt-8"
+              style={{
+                marginLeft: "var(--sidebar-width, 0px)",
+              }}
+            >
+              <div className="w-full max-w-3xl px-6 pb-6">
+                {renderInputBox(false)}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Centered Input for empty state */}
           {isCenteredInput && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl px-6">
-              <div
-                className={`bg-[#1c1c1c]/95 backdrop-blur-md border border-[#2a2a2a] rounded-2xl shadow-2xl transition-all duration-300 ${
-                  uploadingFile ? "py-3" : "py-2"
-                }`}
-              >
-                <div className="flex flex-col gap-2 px-3">
-                  <AnimatePresence>
-                    {uploadingFile && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="flex items-center justify-between bg-[#242424] border border-neutral-700 rounded-xl px-3 py-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-6 h-6 bg-neutral-800 rounded-md flex items-center justify-center flex-shrink-0">
-                              <FileText className="w-4 h-4 text-neutral-400" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-[13px] text-neutral-200">
-                                {uploadingFile.name}
-                              </p>
-                              <p className="text-xs text-neutral-500">
-                                {formatFileSize(uploadingFile.size)}{" "}
-                                {isUploading && (
-                                  <span className="text-blue-400 ml-1">
-                                    Uploading...
-                                  </span>
-                                )}
-                                {!isUploading && (
-                                  <span className="text-green-400 ml-1">
-                                    ✓ Ready
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={removeFile}
-                            className="p-1 rounded-md hover:bg-neutral-700 transition flex-shrink-0"
-                          >
-                            <X className="w-4 h-4 text-neutral-400 hover:text-neutral-200" />
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="file"
-                      id="file-upload-center"
-                      hidden
-                      onChange={handleFileUpload}
-                      disabled={isUploading}
-                      accept=".pdf,.doc,.docx,.txt"
-                    />
-
-                    <button
-                      onClick={() =>
-                        document.getElementById("file-upload-center")?.click()
-                      }
-                      disabled={isUploading}
-                      className="text-neutral-400 hover:text-white transition disabled:opacity-50 flex-shrink-0"
-                    >
-                      {isUploading ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Plus className="w-5 h-5" />
-                      )}
-                    </button>
-
-                    <input
-                      placeholder="Ask anything..."
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      disabled={isProcessing}
-                      className="flex-1 bg-transparent border-0 text-neutral-100 placeholder-neutral-500 outline-none text-[15px] py-3 px-1 disabled:opacity-50"
-                    />
-
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!inputValue.trim() || isProcessing}
-                      className={`p-2.5 rounded-full transition flex-shrink-0 ${
-                        inputValue.trim() && !isProcessing
-                          ? "bg-purple-600 hover:bg-purple-700 text-white"
-                          : "bg-[#2a2a2a] text-neutral-500 cursor-not-allowed"
-                      }`}
-                    >
-                      {isProcessing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {renderInputBox(true)}
             </div>
           )}
         </div>
