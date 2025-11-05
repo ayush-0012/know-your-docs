@@ -16,52 +16,18 @@ import {
 } from "@/components/ui/sidebar";
 import { getCurrUser } from "@/lib/actions/general.actions";
 import axiosInstance from "@/lib/axiosInstance";
+import type {
+  Chat,
+  ChatDetail,
+  FileInfo,
+  Message,
+  User,
+} from "@/lib/types/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { FileText, Loader2, Plus, Send, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-
-interface Chat {
-  id: string;
-  chatTitle: string;
-  timestamp: Date;
-}
-
-interface FileInfo {
-  id: string;
-  name: string;
-  fileName?: string;
-}
-
-interface Query {
-  id: string;
-  query: string;
-  response: string;
-}
-
-interface ChatDetail {
-  chatId: string;
-  file: FileInfo;
-  queries: Query[];
-}
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  isStreaming?: boolean;
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  emailVerified: boolean;
-  image?: string | null | undefined;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 const Chat = () => {
   const router = useRouter();
