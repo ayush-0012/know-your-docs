@@ -9,23 +9,45 @@ import { namespace, pc } from "@/vectordb";
 import { GoogleGenAI } from "@google/genai";
 import type { Request, Response } from "express";
 
+let defaultChatTitle: string;
+
 export async function uplaodFileContent(req: Request, res: Response) {
   const file = req.file;
   console.log("file", file);
 
-  const { chatId } = req.body;
+  let { userId, chatId } = req.body;
+
+  console.log("req body for file upload", req.body);
 
   if (!file) {
     return res.status(404).json({ success: false, message: "file is missing" });
   }
 
-  if (!chatId)
+  if (!userId)
     return res
       .status(404)
-      .json({ success: false, message: "chatId is missing" });
+      .json({ success: false, message: "userId is missing for file upload" });
 
   try {
-    // TODO: db entry of file metadata
+    // Create a new chat if chatId is not provided
+    if (!chatId) {
+      defaultChatTitle = file.originalname;
+      chatId = await createNewChat(userId, defaultChatTitle);
+
+      console.log("created chat for file upload, id:", chatId);
+
+      // Validate chat creation
+      if (
+        !chatId ||
+        chatId.startsWith("error") ||
+        chatId === "userId is missing"
+      ) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to create chat for file upload",
+        });
+      }
+    }
 
     console.log("filename", file.originalname);
 
@@ -38,10 +60,6 @@ export async function uplaodFileContent(req: Request, res: Response) {
     const chunks = await createChunks(extractedText);
 
     console.log("chunks", chunks);
-
-    // const embeddings = await createEmbeddings(chunks);
-
-    // console.log("embeddings", embeddings);
 
     // using pincone's interface api for embeddings
     const embeddingResponse = await pc.inference.embed(
@@ -59,6 +77,8 @@ export async function uplaodFileContent(req: Request, res: Response) {
       metadata: {
         chunk_text: chunk,
         filename: file.originalname,
+        userId,
+        chatId,
         chunkIndex: index,
       },
     }));
@@ -71,10 +91,11 @@ export async function uplaodFileContent(req: Request, res: Response) {
       chunksProcessed: chunks.length,
       message: "File content successfully uploaded to Pinecone",
       docDetails: doc,
+      chatId: chatId, // Return chatId so frontend can use it
     });
   } catch (error) {
     return res.json({
-      success: true,
+      success: false,
       message: "Error occurred while uploading the file",
       error,
     });
@@ -86,14 +107,15 @@ export async function respondToQuery(req: Request, res: Response) {
 
   console.log("req body", req.body);
 
-  if (!userId || !userQuery || !chatTitle) {
+  if (!userId || !userQuery) {
     return res.status(404).json({
-      message: "some value from body is missing",
+      message: "userId or userQuery is missing",
     });
   }
 
   let chatIdFromDB = chatId;
 
+  // Create new chat if chatId is not provided
   if (!chatId) {
     if (!chatTitle) {
       return res.status(400).json({
@@ -123,47 +145,50 @@ export async function respondToQuery(req: Request, res: Response) {
       query: {
         topK: 5,
         inputs: { text: userQuery },
+        filter: {
+          $and: [
+            { userId: { $eq: userId } },
+            { chatId: { $eq: chatIdFromDB } },
+          ],
+        },
       },
-
-      fields: ["chunk_text", "filename"],
+      fields: ["chunk_text", "filename", "userId", "chatId"],
     });
-
-    // const hits = Array.isArray(contextResponse?.result?.hits)
-    //   ? contextResponse.result.hits
-    //   : [];
-
-    console.log("context res", contextResponse);
 
     const contextChunks = contextResponse.result.hits
       ?.map((hit) => {
         const fields = hit?.fields as {
           chunk_text?: string;
           filename?: string;
+          userId?: string;
+          chatId?: string;
         };
-
         return fields?.chunk_text;
       })
       .filter(Boolean)
       .join("\n\n---\n\n");
 
-    // Check if context was found
-    if (!contextChunks) {
-      return res.status(400).json({
-        success: false,
-        message: "No context found for the query",
-      });
-    }
+    // Prepare prompt based on whether context exists or not
+    let prompt: string;
 
-    //after that, we'll feed the context to gemini and generate a response for user
+    if (!contextChunks || contextChunks.trim() === "") {
+      // No documents uploaded - respond conversationally
+      prompt = `You are a helpful AI assistant. You can only answer questions related to the documents the user uploads in this chat.
 
-    if (!contextChunks) {
-      return res.status(400).json({
-        success: false,
-        message: "No context found for the query",
-      });
-    }
+If the user asks anything that is not related to their uploaded documents, respond politely with:
+"That’s not in the context. I can only answer questions related to your uploaded document."
 
-    const prompt = `You are a helpful AI assistant that answers questions about documents.
+If the user talks about or asks something related to their documents but has not uploaded any yet, respond with:
+"Please upload a document first so I can assist you with it."
+
+Otherwise, if the user’s message is about their uploaded document, respond naturally and helpfully.
+
+USER MESSAGE: ${userQuery}
+
+RESPONSE:`;
+    } else {
+      // Documents exist - use RAG approach
+      prompt = `You are a helpful AI assistant that answers questions about documents.
 
 Your task is to provide detailed and comprehensive answers based solely on the information in the context below.
 
@@ -180,6 +205,9 @@ ${contextChunks}
 QUESTION: ${userQuery}
 
 ANSWER:`;
+    }
+
+    console.log("Has context:", !!contextChunks);
 
     if (!process.env.GEMINI_API_KEY) {
       console.log("gemini api is missing");
@@ -202,7 +230,11 @@ ANSWER:`;
       responseForUser.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (generatedText) {
-      const queryRes = await storeUserQuery(userQuery, generatedText, chatId);
+      const queryRes = await storeUserQuery(
+        userQuery,
+        generatedText,
+        chatIdFromDB // Use chatIdFromDB instead of chatId
+      );
       console.log("query res", queryRes);
     }
 
@@ -211,6 +243,7 @@ ANSWER:`;
       message: "Successfully responded to the user query",
       chatId: chatIdFromDB,
       answer: generatedText,
+      hasDocuments: !!contextChunks, // Let frontend know if documents exist
     });
   } catch (error) {
     return res.status(500).json({
