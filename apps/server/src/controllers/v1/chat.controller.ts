@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { chat } from "@/db/schema/schema";
 import { fetchChatData } from "@/services/file.services";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 export async function fetchChatConversation(req: Request, res: Response) {
@@ -48,17 +48,15 @@ export async function fetchUserChats(req: Request, res: Response) {
     const userChats = await db
       .select()
       .from(chat)
-      .where(eq(chat.userId, userIdStr));
+      .where(eq(chat.userId, userIdStr))
+      .orderBy(desc(chat.createdAt));
 
-    // sorting by latest
-    const chats = userChats.reverse();
-
-    console.log("userchats by latest", chats);
+    console.log("userchats by latest", userChats);
 
     return res.status(200).json({
       success: true,
       message: "Successfully fetched user chats",
-      userChats: chats,
+      userChats,
     });
   } catch (error) {
     return res.status(500).json({
