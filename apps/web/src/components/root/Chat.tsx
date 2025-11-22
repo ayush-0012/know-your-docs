@@ -25,6 +25,7 @@ const Chat = () => {
   const [uploadingFile, setUploadingFile] = useState<File | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -94,17 +95,20 @@ const Chat = () => {
     }
   }, []);
 
-  // Auto-scroll
+  // Auto-scroll - ONLY when user sends a new message
   useEffect(() => {
+    if (!shouldScrollToBottom) return;
+
     const scrollToBottom = () => {
-      if (messagesEndRef.current && isAtBottomRef.current) {
+      if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
       }
+      setShouldScrollToBottom(false);
     };
 
     const timeoutId = setTimeout(scrollToBottom, 100);
     return () => clearTimeout(timeoutId);
-  }, [messages]);
+  }, [shouldScrollToBottom]);
 
   const handleSendMessage = useCallback(
     async (inputMessage: string) => {
@@ -112,6 +116,7 @@ const Chat = () => {
 
       setIsCenteredInput(false);
       setIsProcessing(true);
+      setShouldScrollToBottom(true); // Trigger scroll when user sends message
 
       const newMessage: Message = {
         id: `temp-user-${Date.now()}`,
@@ -152,10 +157,11 @@ const Chat = () => {
         let accumulatedText = "";
 
         eventSource.onmessage = (event) => {
-          const chunk = event.data;
+          // parsing the encoding data from sse
+          const chunk = JSON.parse(event.data);
           accumulatedText += chunk;
 
-          // Update immediately - backend already throttles at 25ms
+          // Update content immediately - MessageItem will handle raw vs markdown display
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === aiMessageId
