@@ -103,9 +103,9 @@ export async function uplaodFileContent(req: Request, res: Response) {
 }
 
 export async function respondToQuery(req: Request, res: Response) {
-  const { userId, chatId, chatTitle, userQuery } = req.body;
+  const { userId, chatId, chatTitle, userQuery } = req.query;
 
-  console.log("req body", req.body);
+  console.log("req query", req.query);
 
   if (!userId || !userQuery) {
     return res.status(404).json({
@@ -215,36 +215,71 @@ ANSWER:`;
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-    const responseForUser = await ai.models.generateContent({
+    const resStream = await ai.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: { role: "user", parts: [{ text: prompt }] },
     });
 
-    console.log("gemini response", responseForUser);
-
-    if (!responseForUser) console.log("gemini failed to generate");
-
-    // extracting only text from gemini's response
-    const generatedText =
-      responseForUser.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (generatedText) {
-      const queryRes = await storeUserQuery(
-        userQuery,
-        generatedText,
-        chatIdFromDB // Use chatIdFromDB instead of chatId
-      );
-      console.log("query res", queryRes);
+    if (!resStream) {
+      console.log("gemini failed to generate");
+      return res.status(500).json({ error: "Failed to generate response" });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Successfully responded to the user query",
-      chatId: chatIdFromDB,
-      answer: generatedText,
-      hasDocuments: !!contextChunks, // Let frontend know if documents exist
-    });
+    // Setup SSE headers
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders(); // sends headers immediately
+
+    try {
+      if (!chatId) {
+        res.write(`event: chatId\ndata: ${chatIdFromDB}\n\n`);
+      }
+
+      let fullResponse = "";
+
+      for await (const chunk of resStream) {
+        console.log(chunk.text);
+        const token = chunk.text;
+        fullResponse += token;
+
+        // Encode the token to preserve special characters
+        const encodedToken = JSON.stringify(token);
+        res.write(`data: ${encodedToken}\n\n`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // // Stream the response chunks
+      // for await (const chunk of resStream) {
+      //   // Type-safe access to text method and its result
+      //   if (chunk && typeof chunk.text === "function") {
+      //     const token = chunk.text;
+      //     if (token) {
+      //       fullResponse += token;
+      //       res.write(`data: ${token}\n\n`);
+      //     }
+      //   }
+      // }
+
+      console.log("Full response:", fullResponse);
+
+      // Store the complete response in DB after streaming is done
+      if (fullResponse) {
+        const queryRes = await storeUserQuery(
+          userQuery,
+          fullResponse,
+          chatIdFromDB
+        );
+        console.log("query res", queryRes);
+      }
+
+      // Send end event
+      res.write("event: end\ndata: done\n\n");
+      res.end();
+    } catch (error: any) {
+      res.write(`event: error\ndata: ${error.message}\n\n`);
+      res.end();
+    }
   } catch (error) {
     return res.status(500).json({
       success: false,
