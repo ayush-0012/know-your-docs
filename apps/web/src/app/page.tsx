@@ -1,196 +1,145 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MessageSquare, Sparkles, Upload, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  MessageSquare,
+  ShieldCheck,
+  Upload,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-gradient-hero dark">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <div className="absolute top-20 left-10 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl"></div>
-        </div>
+    <div className="min-h-screen bg-[#050505] text-neutral-200 font-sans selection:bg-purple-900/50">
+      {/* Background - Minimal Static Noise/Dots */}
+      <div className="fixed inset-0 z-0 opacity-20 bg-[radial-gradient(#404040_1px,transparent_1px)] [background-size:20px_20px]"></div>
 
-        <div className="relative container mx-auto px-4 pt-20 pb-32">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
-              <Sparkles className="w-4 h-4 text-purple-400" />
-              <span className="text-sm font-medium text-purple-300">
-                RAG-Powered Document Intelligence
+      {/* Navbar */}
+      <nav className="relative z-50 container mx-auto px-6 py-8 flex justify-between items-center border-b border-white/5">
+        <div className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <div className="w-3 h-3 bg-purple-600"></div>
+          KnowYourDocs
+        </div>
+        <div className="flex gap-6 items-center">
+          {/* <Link
+            href="/auth"
+            className="text-sm font-medium text-neutral-400 hover:text-white transition-colors"
+          >
+            Login
+          </Link> */}
+          <Link href="/auth">
+            <Button
+              size="sm"
+              className="bg-white text-black hover:bg-neutral-200 font-medium rounded-none h-9 px-6"
+            >
+              Get Started
+            </Button>
+          </Link>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative z-10 pt-24 pb-16 container mx-auto px-4 text-center">
+        <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-white mb-6">
+          Your documents, <span className="text-purple-500">understood.</span>
+        </h1>
+        <p className="text-lg text-neutral-500 max-w-lg mx-auto leading-relaxed">
+          The cleanest RAG solution for your data. Upload files and get precise
+          answers instantly.
+        </p>
+      </section>
+
+      {/* Even Bento Grid (2x2) */}
+      <section className="relative z-10 container mx-auto px-4 pb-24 max-w-5xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* CARD 1: Chat Interface Preview */}
+          <Card className="bg-neutral-900/40 border-white/5 p-6 h-[320px] flex flex-col justify-between overflow-hidden relative group hover:border-purple-500/20 transition-colors duration-300">
+            <div className="absolute top-6 left-6 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-purple-500" />
+              <span className="text-sm font-medium text-white">
+                Live Interaction
               </span>
             </div>
 
-            <h1 className="text-6xl md:text-7xl font-bold leading-tight text-white">
-              Know Your <span className="text-fuchsia-500">Docs</span>
-            </h1>
+            <div className="mt-12 space-y-4">
+              {/* User Message - LEFT */}
+              <div className="flex justify-start w-full">
+                <div className="bg-neutral-800 text-neutral-300 px-4 py-3 rounded-lg rounded-tl-none text-sm max-w-[80%] border border-white/5">
+                  What is the net profit margin?
+                </div>
+              </div>
 
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Upload your documents and unlock instant insights. Ask questions,
-              get precise answers—powered by advanced RAG technology.
-            </p>
-
-            <div className="flex gap-4 justify-center pt-4">
-              <Link href="/auth">
-                <Button
-                  size="lg"
-                  className="bg-purple-600 hover:bg-purple-700 text-white shadow-glow border-0"
-                >
-                  Get Started Free
-                </Button>
-              </Link>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-purple-500/50 text-white hover:bg-purple-500/10 bg-transparent"
-              >
-                Learn More
-              </Button>
+              {/* AI Message - RIGHT */}
+              <div className="flex justify-end w-full">
+                <div className="bg-purple-900/40 text-purple-100 px-4 py-3 rounded-lg rounded-tr-none text-sm max-w-[80%] border border-purple-500/20 shadow-[0_0_15px_-5px_rgba(168,85,247,0.4)]">
+                  The net profit margin for FY24 is 18.5%, up from 16% last
+                  year.
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-20 container mx-auto px-4 relative">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-4 text-white">
-            Everything you need to understand your documents
-          </h2>
-          <p className="text-gray-400 text-lg">
-            Powerful features designed for seamless document interaction
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          <Card className="p-8 bg-gradient-card border-purple-500/30 hover:shadow-elegant transition-all duration-300">
-            <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center mb-6">
-              <Upload className="w-6 h-6 text-purple-400" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3 text-white">
-              Easy Upload
-            </h3>
-            <p className="text-gray-400">
-              Drag and drop your documents or paste content directly. Support
-              for PDFs, Word docs, and more.
-            </p>
           </Card>
 
-          <Card className="p-8 bg-gradient-card border-purple-500/30 hover:shadow-elegant transition-all duration-300">
-            <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center mb-6">
-              <MessageSquare className="w-6 h-6 text-purple-400" />
+          {/* CARD 2: Speed / Efficiency */}
+          <Card className="bg-neutral-900/40 border-white/5 p-6 h-[320px] flex flex-col justify-center items-center text-center relative hover:border-purple-500/20 transition-colors duration-300">
+            <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center mb-6">
+              <Zap className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-xl font-semibold mb-3 text-white">
-              Intelligent Q&A
-            </h3>
-            <p className="text-gray-400">
-              Ask questions in natural language and get accurate, context-aware
-              answers from your documents.
-            </p>
-          </Card>
-
-          <Card className="p-8 bg-gradient-card border-purple-500/30 hover:shadow-elegant transition-all duration-300">
-            <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center mb-6">
-              <Zap className="w-6 h-6 text-purple-400" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3 text-white">
+            <h3 className="text-xl font-bold text-white mb-2">
               Lightning Fast
             </h3>
-            <p className="text-gray-400">
-              Powered by RAG technology for instant retrieval and generation of
-              relevant information.
+            <p className="text-neutral-500 text-sm max-w-[200px]">
+              Vector indexing ensures your queries are answered in milliseconds.
+            </p>
+          </Card>
+
+          {/* CARD 3: Upload Capability */}
+          <Card className="bg-neutral-900/40 border-white/5 p-6 h-[320px] flex flex-col justify-center items-center text-center relative hover:border-purple-500/20 transition-colors duration-300">
+            <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center mb-6">
+              <Upload className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Simple Upload</h3>
+            <p className="text-neutral-500 text-sm max-w-[200px]">
+              Select your PDFs or text files. We handle the parsing and
+              processing.
+            </p>
+          </Card>
+
+          {/* CARD 4: Security */}
+          <Card className="bg-neutral-900/40 border-white/5 p-6 h-[320px] flex flex-col justify-center items-center text-center relative hover:border-purple-500/20 transition-colors duration-300">
+            <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center mb-6">
+              <ShieldCheck className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Secure Core</h3>
+            <p className="text-neutral-500 text-sm max-w-[200px]">
+              Your data remains yours. Encrypted at rest, never used for
+              training.
             </p>
           </Card>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-20 container mx-auto px-4 relative">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-white">How it works</h2>
-            <p className="text-gray-400 text-lg">
-              Get started in three simple steps
-            </p>
-          </div>
-
-          <div className="space-y-12">
-            <div className="flex gap-6 items-start">
-              <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-glow">
-                1
-              </div>
-              <div>
-                <h3 className="text-2xl font-semibold mb-2 text-white">
-                  Upload Your Documents
-                </h3>
-                <p className="text-gray-400">
-                  Simply upload your PDFs, documents, or paste text content into
-                  the platform.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-6 items-start">
-              <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-glow">
-                2
-              </div>
-              <div>
-                <h3 className="text-2xl font-semibold mb-2 text-white">
-                  Ask Questions
-                </h3>
-                <p className="text-gray-400">
-                  Type your questions in natural language—no technical knowledge
-                  required.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-6 items-start">
-              <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-glow">
-                3
-              </div>
-              <div>
-                <h3 className="text-2xl font-semibold mb-2 text-white">
-                  Get Instant Answers
-                </h3>
-                <p className="text-gray-400">
-                  Receive accurate, contextual answers powered by advanced RAG
-                  technology.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 container mx-auto px-4 relative">
-        <Card className="max-w-4xl mx-auto p-12 text-center bg-gradient-card border-purple-500/30">
-          <h2 className="text-4xl font-bold mb-4 text-white">
-            Ready to unlock your documents?
+      {/* High Visibility CTA */}
+      <section className="relative z-10 py-20 bg-white text-black border-t border-white/10">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight">
+            Ready to start?
           </h2>
-          <p className="text-gray-400 text-lg mb-8">
-            Join thousands of users already getting instant answers from their
-            documents.
+          <p className="text-neutral-600 mb-8 max-w-md mx-auto">
+            Experience the future of document interaction today.
           </p>
-          <Link href="/auth">
-            <Button
-              size="lg"
-              className="bg-purple-600 hover:bg-purple-700 text-white shadow-glow border-0"
-            >
-              Start Free Today
-            </Button>
-          </Link>
-        </Card>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 border-t border-purple-500/20">
-        <div className="container mx-auto px-4 text-center text-gray-500">
-          <p>&copy; 2025 Know Your Docs. All rights reserved.</p>
+          <div className="flex justify-center">
+            <Link href="/auth">
+              <Button
+                size="lg"
+                className="bg-purple-600 text-white hover:bg-purple-700 rounded-none px-10 h-14 text-lg"
+              >
+                Upload Document <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
+          </div>
         </div>
-      </footer>
+      </section>
     </div>
   );
 };
