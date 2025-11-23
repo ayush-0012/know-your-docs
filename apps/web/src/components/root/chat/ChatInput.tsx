@@ -14,6 +14,7 @@ interface ChatInputProps {
   onRemoveFile: () => void;
   formatFileSize: (bytes: number) => string;
   isCentered: boolean;
+  hasDocument?: boolean; // NEW PROP
 }
 
 export const ChatInput = memo(
@@ -27,8 +28,10 @@ export const ChatInput = memo(
     onRemoveFile,
     formatFileSize,
     isCentered,
+    hasDocument = false, // NEW PROP with default value
   }: ChatInputProps) => {
     const [inputValue, setInputValue] = useState("");
+    const [showDocumentWarning, setShowDocumentWarning] = useState(false);
 
     const handleSend = useCallback(() => {
       if (inputValue.trim() && !isProcessing) {
@@ -36,6 +39,17 @@ export const ChatInput = memo(
         setInputValue("");
       }
     }, [inputValue, isProcessing, onSend]);
+
+    const handleFileButtonClick = () => {
+      if (hasDocument) {
+        setShowDocumentWarning(true);
+        setTimeout(() => setShowDocumentWarning(false), 3000);
+      } else {
+        document
+          .getElementById(isCentered ? "file-upload-center" : "file-upload")
+          ?.click();
+      }
+    };
 
     return (
       <div
@@ -84,6 +98,24 @@ export const ChatInput = memo(
                 </div>
               </motion.div>
             )}
+
+            {/* Document Warning Message */}
+            {showDocumentWarning && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl px-3 py-2">
+                  <p className="text-xs text-orange-400">
+                    ⚠️ This chat already has a document. Please create a new
+                    chat to upload another document.
+                  </p>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
 
           <div className="flex items-center gap-3">
@@ -92,27 +124,34 @@ export const ChatInput = memo(
               id={isCentered ? "file-upload-center" : "file-upload"}
               hidden
               onChange={onFileUpload}
-              disabled={isUploading || isUserLoading}
+              disabled={isUploading || isUserLoading || hasDocument}
               accept=".pdf,.doc,.docx,.txt"
             />
 
-            <button
-              onClick={() =>
-                document
-                  .getElementById(
-                    isCentered ? "file-upload-center" : "file-upload"
-                  )
-                  ?.click()
-              }
-              disabled={isUploading || isUserLoading}
-              className="text-neutral-400 hover:text-white transition disabled:opacity-50 flex-shrink-0"
-            >
-              {isUploading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Plus className="w-5 h-5" />
-              )}
-            </button>
+            <div className="relative">
+              <button
+                onClick={handleFileButtonClick}
+                disabled={isUploading || isUserLoading}
+                className={`text-neutral-400 hover:text-white transition disabled:opacity-50 flex-shrink-0 relative ${
+                  hasDocument ? "cursor-not-allowed" : ""
+                }`}
+                title={
+                  hasDocument
+                    ? "One document per chat. Create a new chat to upload another."
+                    : "Upload document"
+                }
+              >
+                {isUploading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Plus
+                    className={`w-5 h-5 ${
+                      hasDocument ? "text-neutral-600" : ""
+                    }`}
+                  />
+                )}
+              </button>
+            </div>
 
             <input
               placeholder="Ask anything..."
