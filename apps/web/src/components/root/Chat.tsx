@@ -475,6 +475,7 @@ const Chat = () => {
                   onRemoveFile={removeFile}
                   formatFileSize={formatFileSize}
                   isCentered={true}
+                  hasDocument={!!currentFile}
                 />
               </div>
             )}
@@ -493,6 +494,7 @@ const Chat = () => {
                   onRemoveFile={removeFile}
                   formatFileSize={formatFileSize}
                   isCentered={false}
+                  hasDocument={!!currentFile}
                 />
               </div>
             </div>
