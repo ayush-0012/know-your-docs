@@ -6,7 +6,7 @@ import { useEventSource } from "@/hooks/eventSource";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { getCurrUser } from "@/lib/actions/general.actions";
 import axiosInstance from "@/lib/axiosInstance";
-import type { Chat, Message, User } from "@/lib/types/types";
+import type { Chat as ChatType, Message, User } from "@/lib/types/types";
 import { FileText, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,7 +18,7 @@ const Chat = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [chats, setChats] = useState<ChatType[]>([]);
   const [isCenteredInput, setIsCenteredInput] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -199,7 +199,7 @@ const Chat = () => {
               );
               if (chatResponse.data.success) {
                 const newChat = chatResponse.data.userChats.find(
-                  (chat: Chat) => chat.id === newChatId
+                  (chat: ChatType) => chat.id === newChatId
                 );
 
                 if (newChat) {
@@ -343,7 +343,7 @@ const Chat = () => {
         if (response.data.docDetails.chatId && !chatId) {
           const newChatId = response.data.docDetails.chatId;
 
-          const newChat: Chat = {
+          const newChat: ChatType = {
             id: newChatId,
             chatTitle: response.data.docDetails.fileName || "New Chat",
             timestamp: new Date(),
