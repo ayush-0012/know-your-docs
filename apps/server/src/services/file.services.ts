@@ -1,9 +1,111 @@
 import { db } from "@/db";
 import { chat, docs, userQuery } from "@/db/schema/schema";
-import { GoogleGenAI } from "@google/genai";
 import { and, eq } from "drizzle-orm";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import textract from "textract";
+
+export class ChatOperations {
+  constructor() {}
+
+  async createNewChat(userId: string, chatTitle: string): Promise<string> {
+    if (!userId) {
+      return "userId is missing";
+    }
+
+    try {
+      const chatResult = await db
+        .insert(chat)
+        .values({
+          chatTitle,
+          userId,
+        })
+        .returning();
+
+      const chatId = chatResult[0].id;
+
+      return chatId;
+    } catch (error) {
+      console.log("chat error", error);
+      return "error occurred while creating a chat";
+    }
+  }
+
+  async storeDocMetaData(chatId: string, fileName: string) {
+    try {
+      const docResult = await db
+        .insert(docs)
+        .values({
+          fileName,
+          chatId,
+        })
+        .returning();
+
+      const doc = docResult[0];
+
+      return doc;
+    } catch (error) {
+      console.log("doc error", error);
+      return "error occurred while storing doc";
+    }
+  }
+
+  async storeUserQuery(query: string, response: string, chatId: string) {
+    try {
+      const queryResult = await db
+        .insert(userQuery)
+        .values({
+          query,
+          response,
+          chatId,
+        })
+        .returning();
+
+      const queryRes = queryResult[0];
+
+      return queryRes;
+    } catch (error) {
+      console.log("query error", error);
+      return "error occurred while storing query";
+    }
+  }
+
+  async fetchChatData(chatId: string, userId: string) {
+    try {
+      const chatResult = await db
+        .select({
+          queryId: userQuery.id,
+          queryText: userQuery.query,
+          response: userQuery.response,
+          docId: docs.id,
+          fileName: docs.fileName,
+        })
+        .from(userQuery)
+        .innerJoin(docs, eq(userQuery.chatId, docs.chatId))
+        .innerJoin(chat, eq(chat.id, userQuery.chatId))
+        .where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
+
+      const groupedData = {
+        chatId,
+        file: {
+          id: chatResult[0]?.docId,
+          name: chatResult[0]?.fileName,
+        },
+        queries: chatResult.map((r) => ({
+          id: r.queryId,
+          query: r.queryText,
+          response: r.response,
+        })),
+      };
+
+      console.log("grouped data", groupedData);
+
+      return groupedData;
+    } catch (error) {
+      console.log("error occurred while fetching chat data");
+      return error;
+    }
+  }
+}
 
 export function extractText(file) {
   return new Promise((resolve, reject) => {
@@ -35,20 +137,20 @@ export async function createChunks(text: string) {
   return chunks.map((doc) => doc.pageContent);
 }
 
-export async function createEmbeddings(chunks) {
-  if (!process.env.GEMINI_API_KEY) {
-    console.log("api is missing");
-    throw new Error("google api is missingg");
-  }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// export async function createEmbeddings(chunks) {
+//   if (!process.env.GEMINI_API_KEY) {
+//     console.log("api is missing");
+//     throw new Error("google api is missingg");
+//   }
+//   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  const response = await ai.models.embedContent({
-    model: "gemini-embedding-001",
-    contents: chunks,
-  });
+//   const response = await ai.models.embedContent({
+//     model: "gemini-embedding-001",
+//     contents: chunks,
+//   });
 
-  return response.embeddings;
-}
+//   return response.embeddings;
+// }
 
 export async function createNewChat(
   userId: string,
