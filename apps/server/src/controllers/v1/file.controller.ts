@@ -5,7 +5,7 @@ import {
   storeDocMetaData,
   storeUserQuery,
 } from "@/services/file.services";
-import { namespace, pc } from "@/vectordb";
+import { namespace, pc } from "@/services/vectordb/index";
 import { GoogleGenAI } from "@google/genai";
 import type { Request, Response } from "express";
 
