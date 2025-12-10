@@ -10,6 +10,7 @@ import type { Chat as ChatType, Message, User } from "@/lib/types/types";
 import { FileText, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import UserMenu from "../user-menu";
 import { ChatInput } from "./chat/ChatInput";
 import { ChatSidebar } from "./chat/ChatSidebar";
 import { MessageItem } from "./chat/MessageItem";
@@ -406,17 +407,21 @@ const Chat = () => {
         />
 
         <div className="flex-1 flex flex-col h-screen">
-          <header className="h-14 border-b border-neutral-800 flex items-center px-6 gap-4 bg-neutral-900 flex-shrink-0 z-20">
-            <SidebarTrigger className="text-neutral-400" />
+          <header className="h-14 border-b border-neutral-800 flex items-center justify-between px-6 bg-neutral-900 shrink-0 z-20">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger className="text-neutral-400" />
 
-            {currentFile && !isEmptyChat && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-neutral-800/50 rounded-lg border border-neutral-700/50">
-                <FileText className="w-4 h-4 text-purple-400" />
-                <span className="text-sm font-medium text-neutral-100">
-                  {currentFile.name}
-                </span>
-              </div>
-            )}
+              {currentFile && !isEmptyChat && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-neutral-800/50 rounded-lg border border-neutral-700/50">
+                  <FileText className="w-4 h-4 text-purple-400" />
+                  <span className="text-sm font-medium text-neutral-100">
+                    {currentFile.name}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <UserMenu />
           </header>
 
           <div className="flex-1 relative overflow-hidden">
@@ -482,7 +487,7 @@ const Chat = () => {
           </div>
 
           {!isCenteredInput && (
-            <div className="border-t border-neutral-800 bg-neutral-900 flex-shrink-0 z-20">
+            <div className="border-t border-neutral-800 bg-neutral-900 shrink-0 z-20">
               <div className="max-w-3xl mx-auto px-6 py-4">
                 <ChatInput
                   onSend={handleSendMessage}

@@ -6,30 +6,53 @@ import { authClient } from "@/lib/auth-client";
 import { Github } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const Auth = () => {
   const router = useRouter();
+  const { data: session, isPending } = authClient.useSession();
 
   const redirectUrl = process.env.NEXT_PUBLIC_APP_URL + "/chat";
 
-  const handleGithubAuth = async () => {
-    // TODO: Implement GitHub OAuth
+  // Redirect authenticated users to chat
+  useEffect(() => {
+    if (session) {
+      router.push("/chat");
+    }
+  }, [session, router]);
 
+  const handleGithubAuth = async () => {
     try {
       const { data, error } = await authClient.signIn.social({
         provider: "github",
         callbackURL: redirectUrl,
       });
 
-      router.push("/chat");
+      if (data) {
+        router.push("/chat");
+      }
 
-      console.log("data", data);
-      console.log("error", error);
+      if (error) {
+        console.error("Authentication error:", error);
+      }
     } catch (error) {
-      console.log(error);
+      console.error("GitHub auth error:", error);
     }
-    console.log("GitHub authentication clicked");
   };
+
+  // Show loading state while checking session
+  if (isPending) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // Don't render auth form if already authenticated
+  if (session) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
