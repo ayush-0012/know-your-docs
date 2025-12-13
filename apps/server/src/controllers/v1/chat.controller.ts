@@ -51,8 +51,6 @@ export async function fetchUserChats(req: Request, res: Response) {
       .where(eq(chat.userId, userIdStr))
       .orderBy(desc(chat.createdAt));
 
-    console.log("userchats by latest", userChats);
-
     return res.status(200).json({
       success: true,
       message: "Successfully fetched user chats",

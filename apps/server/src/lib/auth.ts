@@ -14,6 +14,7 @@ export const auth = betterAuth<BetterAuthOptions>({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      redirectURI: `${process.env.BETTER_AUTH_URL}/api/auth/callback/github`,
     },
   },
   trustedOrigins: [
@@ -28,6 +29,7 @@ export const auth = betterAuth<BetterAuthOptions>({
       sameSite: "none",
       secure: true,
       httpOnly: true,
+      domain: ".kyd-server.online",
     },
   },
 });
