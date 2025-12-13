@@ -15,7 +15,10 @@ export const auth = betterAuth<BetterAuthOptions>({
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
     },
   },
-  trustedOrigins: [process.env.CORS_ORIGIN || ""],
+  trustedOrigins: [
+    process.env.FRONTEND_URL_DEV,
+    process.env.FRONTEND_URL_PROD,
+  ].filter((url): url is string => url !== undefined),
   emailAndPassword: {
     enabled: true,
   },

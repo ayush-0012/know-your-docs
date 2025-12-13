@@ -26,7 +26,7 @@ export class ChatOperations {
       return chatId;
     } catch (error) {
       console.log("chat error", error);
-      return "error occurred while creating a chat";
+      throw new Error("Failed to create chat");
     }
   }
 

@@ -1,8 +1,4 @@
-import {
-  Pinecone,
-  type PineconeRecord,
-  type RecordMetadata,
-} from "@pinecone-database/pinecone";
+import { Pinecone } from "@pinecone-database/pinecone";
 
 export class VectorDBService {
   private pc;
@@ -60,13 +56,19 @@ export class VectorDBService {
       inputType: "passage",
     });
 
-    return res.data;
+    return res;
   }
 
-  async upsertData(vectors: PineconeRecord<RecordMetadata>[]) {
-    const res = await this.namespace.upsert(vectors);
-
-    return res;
+  async upsertData(vectors) {
+    try {
+      console.log("Upserting vectors:", vectors.length);
+      const res = await this.namespace.upsert(vectors);
+      console.log("Upsert response:", res); // ← Add this
+      return res;
+    } catch (error) {
+      console.error("Upsert error:", error); // ← Add this
+      throw error; // ← Should throw, not return
+    }
   }
 
   async contextSearch(userQuery: string, userId: string, chatIdFromDB: string) {
