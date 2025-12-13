@@ -30,6 +30,10 @@ app.use("/api", fileRouter);
 app.use("/api", fileRouterv2);
 app.use("/api", chatRouter);
 
+app.get("/", (req, res) => {
+  res.send("OK");
+});
+
 app.listen(3000, () => {
   console.log("server is running on 3000");
 });
