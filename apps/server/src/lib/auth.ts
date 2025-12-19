@@ -29,7 +29,7 @@ export const auth = betterAuth<BetterAuthOptions>({
       sameSite: "none",
       secure: true,
       httpOnly: true,
-      domain: ".kyd-server.online",
+      domain: ".knowyourdocs.online",
     },
   },
 });
